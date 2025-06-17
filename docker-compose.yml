@@ -1,0 +1,45 @@
+version: '3.8'
+
+services:
+  pg-ip-whitelister:
+    build: .
+    container_name: pg-ip-whitelister
+    ports:
+      - "5000:5000"
+    environment:
+      # Pangolin API Configuration
+      - PANGOLIN_API_URL=${PANGOLIN_API_URL}
+      - PANGOLIN_API_KEY=${PANGOLIN_API_KEY}
+      - PANGOLIN_ORG_ID=${PANGOLIN_ORG_ID}
+      
+      # Flask Configuration
+      - SECRET_KEY=${SECRET_KEY}
+      - FLASK_ENV=${FLASK_ENV:-production}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    
+    # Alternative: Use env_file for easier management
+    # env_file:
+    #   - .env
+    
+    volumes:
+      # Mount logs directory for persistence
+      - ./logs:/app/logs
+      
+      # Mount .env file (uncomment if using env_file approach)
+      # - ./.env:/app/.env:ro
+    
+    restart: unless-stopped
+    
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/api/client-ip"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    
+    networks:
+      - pg-network
+
+networks:
+  pg-network:
+    driver: bridge 

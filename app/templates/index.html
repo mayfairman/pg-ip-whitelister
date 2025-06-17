@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="en" x-data="{ darkMode: localStorage.getItem('darkMode') === 'true' }" :class="{ 'dark': darkMode }">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IP Whitelister for Pangolin</title>
+    <!-- Alpine.js -->
+    <script src="https://unpkg.com/alpinejs@3.10.5/dist/cdn.min.js" defer></script>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        dark: {
+                            50: '#f8fafc',
+                            100: '#f1f5f9',
+                            200: '#e2e8f0',
+                            300: '#cbd5e1',
+                            400: '#94a3b8',
+                            500: '#64748b',
+                            600: '#475569',
+                            700: '#334155',
+                            800: '#1e293b',
+                            900: '#0f172a',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Heroicons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/heroicons@2.0.18/24/outline/index.css">
+    <!-- Custom styles -->
+    <style>
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .dark .gradient-bg {
+            background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+        }
+        .card-hover {
+            transition: all 0.3s ease;
+        }
+        .card-hover:hover {
+            transform: translateY(-2px);
+        }
+        .dark .card-hover:hover {
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+        }
+        .light .card-hover:hover {
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        }
+        .success-glow {
+            animation: successGlow 0.6s ease-in-out;
+        }
+        @keyframes successGlow {
+            0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(34, 197, 94, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+        }
+        .dark .success-glow {
+            animation: darkSuccessGlow 0.6s ease-in-out;
+        }
+        @keyframes darkSuccessGlow {
+            0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.9); }
+            70% { box-shadow: 0 0 0 10px rgba(34, 197, 94, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-dark-900 dark:to-dark-800 min-h-screen transition-colors duration-300">
+    <div class="container mx-auto px-4 py-8 max-w-5xl" x-data="app()">
+        <!-- Dark Mode Toggle -->
+        <div class="flex justify-end mb-6">
+            <button @click="darkMode = !darkMode; localStorage.setItem('darkMode', darkMode)" 
+                    class="inline-flex items-center px-4 py-2 bg-white dark:bg-dark-700 rounded-xl shadow-lg border border-gray-200 dark:border-dark-600 hover:shadow-xl transition-all duration-200">
+                <svg x-show="!darkMode" class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>
+                </svg>
+                <svg x-show="darkMode" class="w-5 h-5 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path>
+                </svg>
+                <span class="ml-2 text-sm font-medium text-gray-700 dark:text-gray-300" x-text="darkMode ? 'Light Mode' : 'Dark Mode'"></span>
+            </button>
+        </div>
+
+        <!-- Header with gradient background -->
+        <header class="gradient-bg text-white rounded-2xl p-8 mb-8 shadow-xl">
+            <div class="flex items-center mb-4">
+                <div class="bg-white bg-opacity-20 p-3 rounded-full mr-4">
+                    <svg class="w-8 h-8" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd"></path>
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="text-4xl font-bold">IP Whitelister</h1>
+                    <p class="text-blue-100 dark:text-blue-200 text-lg">Secure access to Pangolin-protected services</p>
+                </div>
+            </div>
+        </header>
+        
+        <!-- IP Address Card -->
+        <div class="bg-white dark:bg-dark-800 rounded-2xl shadow-lg p-6 mb-6 card-hover border border-gray-100 dark:border-dark-700 transition-colors duration-300">
+            <div class="flex items-center mb-4">
+                <div class="bg-blue-100 dark:bg-blue-900 p-2 rounded-lg mr-3">
+                    <svg class="w-6 h-6 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
+                    </svg>
+                </div>
+                <h2 class="text-xl font-semibold text-gray-800 dark:text-gray-200">Your IP Address</h2>
+            </div>
+            
+            <div x-show="loading" class="flex items-center text-gray-500 dark:text-gray-400">
+                <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Detecting your IP address...
+            </div>
+            
+            <div x-show="!loading && ip" class="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900 dark:to-indigo-900 p-4 rounded-xl border border-blue-200 dark:border-blue-700">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center">
+                        <svg class="w-5 h-5 text-blue-600 dark:text-blue-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
+                        </svg>
+                        <span class="text-lg font-mono text-blue-800 dark:text-blue-200" x-text="ip"></span>
+                    </div>
+                    <span class="text-sm text-blue-600 dark:text-blue-300 bg-blue-100 dark:bg-blue-800 px-2 py-1 rounded-full">This IP will be whitelisted</span>
+                </div>
+            </div>
+            
+            <div x-show="!loading && !ip" class="flex items-center text-red-500 dark:text-red-400 bg-red-50 dark:bg-red-900 p-4 rounded-xl">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                Could not detect your IP address.
+            </div>
+        </div>
+
+        <!-- Resources Card -->
+        <div class="bg-white dark:bg-dark-800 rounded-2xl shadow-lg p-6 mb-6 card-hover border border-gray-100 dark:border-dark-700 transition-colors duration-300">
+            <div class="flex items-center mb-6">
+                <div class="bg-green-100 dark:bg-green-900 p-2 rounded-lg mr-3">
+                    <svg class="w-6 h-6 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                    </svg>
+                </div>
+                <h2 class="text-xl font-semibold text-gray-800 dark:text-gray-200">Available Resources</h2>
+            </div>
+            
+            <div x-show="loadingResources" class="flex items-center justify-center py-8 text-gray-500 dark:text-gray-400">
+                <svg class="animate-spin -ml-1 mr-3 h-6 w-6 text-green-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Loading resources...
+            </div>
+            
+            <div x-show="resourcesError" class="flex items-center text-red-500 dark:text-red-400 bg-red-50 dark:bg-red-900 p-4 rounded-xl mb-4">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <span x-text="resourcesError"></span>
+            </div>
+            
+            <template x-if="!loadingResources && resources.length === 0">
+                <div class="text-center py-8 text-gray-500 dark:text-gray-400">
+                    <svg class="w-12 h-12 mx-auto mb-4 text-gray-300 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path>
+                    </svg>
+                    <p>No resources available.</p>
+                </div>
+            </template>
+            
+            <template x-if="!loadingResources && resources.length > 0">
+                <div>
+                    <p class="mb-6 text-gray-600 dark:text-gray-300 flex items-center">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        Select the resources for which you want to whitelist your IP address:
+                    </p>
+                    
+                    <div class="mb-6">
+                        <button @click="toggleSelectAll" 
+                                class="inline-flex items-center px-4 py-2 text-sm font-medium bg-gray-100 dark:bg-dark-700 hover:bg-gray-200 dark:hover:bg-dark-600 rounded-lg transition-colors text-gray-700 dark:text-gray-300">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            <span x-text="allSelected ? 'Deselect All' : 'Select All'"></span>
+                        </button>
+                    </div>
+                    
+                    <div class="space-y-3 mb-6">
+                        <template x-for="resource in resourcesWithStatus" :key="resource.resourceId">
+                            <div class="border border-gray-200 dark:border-dark-600 rounded-xl p-4 transition-all duration-300"
+                                 :class="{
+                                     'bg-green-50 dark:bg-green-900 border-green-200 dark:border-green-700 success-glow': resource.justWhitelisted,
+                                     'bg-gray-50 dark:bg-dark-700 border-gray-200 dark:border-dark-600': resource.alreadyWhitelisted,
+                                     'bg-white dark:bg-dark-800 hover:bg-gray-50 dark:hover:bg-dark-700': !resource.alreadyWhitelisted && !resource.justWhitelisted
+                                 }">
+                                <div class="flex items-start">
+                                    <div class="flex-shrink-0 mt-1">
+                                        <input type="checkbox" 
+                                            :id="'resource-' + resource.resourceId" 
+                                            :value="resource.resourceId" 
+                                            x-model="selectedResources"
+                                            :disabled="resource.alreadyWhitelisted"
+                                            class="h-5 w-5 text-blue-600 border-gray-300 dark:border-dark-500 rounded focus:ring-blue-500 dark:bg-dark-700">
+                                    </div>
+                                    <label :for="'resource-' + resource.resourceId" 
+                                           class="ml-4 flex-1 cursor-pointer" 
+                                           :class="{'opacity-60': resource.alreadyWhitelisted}">
+                                        <div class="flex items-center justify-between">
+                                            <div class="flex items-center">
+                                                <div class="flex items-center">
+                                                    <svg class="w-5 h-5 mr-2 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9v-9m0-9v9"></path>
+                                                    </svg>
+                                                    <span class="font-semibold text-gray-800 dark:text-gray-200" x-text="resource.name"></span>
+                                                </div>
+                                                <span x-show="!resource.enabled" 
+                                                      class="ml-2 inline-flex items-center px-2 py-1 text-xs font-medium bg-gray-200 dark:bg-dark-600 text-gray-800 dark:text-gray-300 rounded-full">
+                                                    <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636m12.728 12.728L18.364 5.636M5.636 18.364l12.728-12.728"></path>
+                                                    </svg>
+                                                    Disabled
+                                                </span>
+                                            </div>
+                                            <div class="flex items-center">
+                                                <template x-if="resource.alreadyWhitelisted">
+                                                    <span class="inline-flex items-center text-green-600 dark:text-green-400 text-sm font-medium">
+                                                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                                        </svg>
+                                                        Already whitelisted
+                                                    </span>
+                                                </template>
+                                                <template x-if="resource.checkingStatus">
+                                                    <span class="inline-flex items-center text-gray-500 dark:text-gray-400 text-sm">
+                                                        <svg class="animate-spin -ml-1 mr-1 h-3 w-3 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                        </svg>
+                                                        Checking...
+                                                    </span>
+                                                </template>
+                                            </div>
+                                        </div>
+                                        <div class="text-sm text-gray-500 dark:text-gray-400 mt-1 flex items-center">
+                                            <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9v-9m0-9v9"></path>
+                                            </svg>
+                                            <span x-text="resource.fullDomain"></span>
+                                        </div>
+                                    </label>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                    
+                    <div class="flex justify-end">
+                        <button @click="whitelistSelected" 
+                                :disabled="selectedResources.length === 0 || submitting"
+                                :class="{
+                                    'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-lg': selectedResources.length > 0,
+                                    'bg-gray-300 dark:bg-dark-600 cursor-not-allowed': selectedResources.length === 0
+                                }"
+                                class="inline-flex items-center text-white px-6 py-3 rounded-xl font-medium transition-all duration-200 transform hover:scale-105">
+                            <svg x-show="!submitting" class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            <svg x-show="submitting" class="animate-spin -ml-1 mr-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            <span x-show="!submitting">Whitelist Selected Resources</span>
+                            <span x-show="submitting">Processing...</span>
+                        </button>
+                    </div>
+                </div>
+            </template>
+        </div>
+        
+        <!-- Results Section -->
+        <div x-show="resultMessages.length > 0" class="bg-white dark:bg-dark-800 rounded-2xl shadow-lg p-6 border border-gray-100 dark:border-dark-700 transition-colors duration-300">
+            <div class="flex items-center mb-4">
+                <div class="bg-purple-100 dark:bg-purple-900 p-2 rounded-lg mr-3">
+                    <svg class="w-6 h-6 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                </div>
+                <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-200">Results</h3>
+            </div>
+            
+            <div class="space-y-3">
+                <template x-for="(message, index) in resultMessages" :key="index">
+                    <div class="flex items-start p-4 rounded-xl border"
+                         :class="message.success ? 'bg-green-50 dark:bg-green-900 border-green-200 dark:border-green-700 text-green-800 dark:text-green-200' : 'bg-red-50 dark:bg-red-900 border-red-200 dark:border-red-700 text-red-800 dark:text-red-200'">
+                        <svg class="w-5 h-5 mr-3 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                             :class="message.success ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'">
+                            <path x-show="message.success" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            <path x-show="!message.success" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <span x-text="message.text" class="text-sm"></span>
+                    </div>
+                </template>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function app() {
+            return {
+                loading: true,
+                ip: null,
+                resources: [],
+                resourcesWithStatus: [],
+                loadingResources: true,
+                resourcesError: null,
+                selectedResources: [],
+                submitting: false,
+                resultMessages: [],
+                
+                init() {
+                    this.getClientIP();
+                    this.getResources();
+                },
+                
+                getClientIP() {
+                    fetch('/api/client-ip')
+                        .then(response => {
+                            if (!response.ok) {
+                                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                            }
+                            return response.json();
+                        })
+                        .then(data => {
+                            if (data.success) {
+                                this.ip = data.ip;
+                            } else {
+                                console.error('Failed to get IP:', data.error);
+                                this.ip = null;
+                            }
+                            this.loading = false;
+                        })
+                        .catch(error => {
+                            console.error('Error fetching IP:', error);
+                            this.ip = null;
+                            this.loading = false;
+                        });
+                },
+                
+                getResources() {
+                    this.loadingResources = true;
+                    this.resourcesError = null;
+                    
+                    fetch('/api/resources')
+                        .then(response => {
+                            if (!response.ok) {
+                                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                            }
+                            return response.json();
+                        })
+                        .then(data => {
+                            if (data.success) {
+                                this.resources = data.data;
+                                
+                                // Filter out disabled resources and map the remaining ones
+                                this.resourcesWithStatus = data.data
+                                    .filter(resource => resource.enabled !== false)  // Only show enabled resources
+                                    .map(resource => ({
+                                        ...resource,
+                                        alreadyWhitelisted: false,
+                                        whitelistEnabled: true,
+                                        checkingStatus: true
+                                    }));
+                                
+                                // For each resource, check if IP is whitelisted
+                                this.resourcesWithStatus.forEach((resource, index) => {
+                                    this.checkWhitelistStatus(resource, index);
+                                });
+                            } else {
+                                this.resourcesError = data.error || 'Failed to load resources';
+                            }
+                            this.loadingResources = false;
+                        })
+                        .catch(error => {
+                            console.error('Error fetching resources:', error);
+                            this.resourcesError = 'Failed to load resources. Please try again.';
+                            this.loadingResources = false;
+                        });
+                },
+                
+                checkWhitelistStatus(resource, index) {
+                    if (!this.ip) return;
+                    
+                    fetch('/api/check-whitelist', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            resourceId: resource.resourceId,
+                            ip: this.ip
+                        })
+                    })
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        if (data.success) {
+                            this.resourcesWithStatus[index].alreadyWhitelisted = data.isWhitelisted;
+                        } else {
+                            console.error('Failed to check whitelist status:', data.error);
+                        }
+                        this.resourcesWithStatus[index].checkingStatus = false;
+                    })
+                    .catch(error => {
+                        console.error('Error checking whitelist status:', error);
+                        this.resourcesWithStatus[index].checkingStatus = false;
+                    });
+                },
+                
+                get allSelected() {
+                    const availableForSelection = this.resourcesWithStatus.filter(
+                        r => !r.alreadyWhitelisted
+                    );
+                    return availableForSelection.length > 0 && 
+                           this.selectedResources.length === availableForSelection.length;
+                },
+                
+                toggleSelectAll() {
+                    if (this.allSelected) {
+                        this.selectedResources = [];
+                    } else {
+                        this.selectedResources = this.resourcesWithStatus
+                            .filter(r => !r.alreadyWhitelisted)
+                            .map(r => r.resourceId);
+                    }
+                },
+                
+                whitelistSelected() {
+                    if (this.selectedResources.length === 0) return;
+                    
+                    this.submitting = true;
+                    this.resultMessages = [];
+                    
+                    const promises = this.selectedResources.map(resourceId => {
+                        // Convert resourceId to number to match the type in the resource objects
+                        const numericResourceId = parseInt(resourceId, 10);
+                        
+                        // Get the resource data from resourcesWithStatus (which has all the original data)
+                        const resource = this.resourcesWithStatus.find(r => r.resourceId === numericResourceId);
+                        
+                        return fetch('/api/whitelist', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                resourceId: numericResourceId,
+                                ip: this.ip
+                            })
+                        })
+                        .then(response => {
+                            if (!response.ok) {
+                                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                            }
+                            return response.json();
+                        })
+                        .then(result => {
+                            // Get resource name directly from the resource object
+                            let resourceName = `Resource ${numericResourceId}`; // Default fallback
+                            
+                            if (resource && resource.name) {
+                                resourceName = resource.name;
+                            }
+                            
+                            return {
+                                resourceId: numericResourceId,
+                                resourceName: resourceName,
+                                ...result
+                            };
+                        })
+                        .catch(error => {
+                            console.error('Error in promise for resourceId:', resourceId, 'error:', error);
+                            throw error;
+                        });
+                    });
+                    
+                    Promise.all(promises)
+                        .then(results => {
+                            // Process results
+                            results.forEach(result => {
+                                const message = result.success
+                                    ? `Successfully whitelisted IP ${this.ip} for ${result.resourceName}`
+                                    : `Failed to whitelist your IP for ${result.resourceName}: ${result.message}`;
+                                
+                                this.resultMessages.push({
+                                    text: message,
+                                    success: result.success
+                                });
+                                
+                                // Update resource status if successful
+                                if (result.success) {
+                                    // Find and update the resource in resourcesWithStatus
+                                    const resourceIndex = this.resourcesWithStatus.findIndex(
+                                        r => r.resourceId === result.resourceId
+                                    );
+                                    
+                                    if (resourceIndex !== -1) {
+                                        // Create a new array to trigger Alpine.js reactivity
+                                        const newResources = [...this.resourcesWithStatus];
+                                        
+                                        // Update the specific resource
+                                        newResources[resourceIndex] = {
+                                            ...newResources[resourceIndex],
+                                            alreadyWhitelisted: true,
+                                            checkingStatus: false,
+                                            justWhitelisted: true
+                                        };
+                                        
+                                        // Replace the entire array
+                                        this.resourcesWithStatus = newResources;
+                                        
+                                        // Remove highlight after 3 seconds
+                                        setTimeout(() => {
+                                            const currentIndex = this.resourcesWithStatus.findIndex(
+                                                r => r.resourceId === result.resourceId
+                                            );
+                                            if (currentIndex !== -1) {
+                                                const finalResources = [...this.resourcesWithStatus];
+                                                finalResources[currentIndex] = {
+                                                    ...finalResources[currentIndex],
+                                                    justWhitelisted: false
+                                                };
+                                                this.resourcesWithStatus = finalResources;
+                                            }
+                                        }, 3000);
+                                        
+                                        // Remove from selected resources
+                                        const selectedIndex = this.selectedResources.indexOf(result.resourceId.toString());
+                                        if (selectedIndex > -1) {
+                                            this.selectedResources.splice(selectedIndex, 1);
+                                        }
+                                    } else {
+                                        console.error('Could not find resource with ID', result.resourceId, 'in resourcesWithStatus');
+                                    }
+                                }
+                            });
+                            
+                            // Clear selections
+                            this.selectedResources = [];
+                        })
+                        .catch(error => {
+                            console.error('Error during whitelist operation:', error);
+                            this.resultMessages.push({
+                                text: 'An error occurred during the whitelisting operation',
+                                success: false
+                            });
+                        })
+                        .finally(() => {
+                            this.submitting = false;
+                        });
+                }
+            };
+        }
+    </script>
+</body>
+</html>
