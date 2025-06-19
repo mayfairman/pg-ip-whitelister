@@ -48,7 +48,7 @@ mkdir pg-ip-whitelister
 cd pg-ip-whitelister
 # Create .env file
 cat > .env << EOF
-PANGOLIN_API_URL=http://pangolin:3002/v1
+PANGOLIN_API_URL=http://pangolin:3003/v1
 PANGOLIN_API_KEY=your_api_key
 PANGOLIN_ORG_ID=your_org_id
 SECRET_KEY=$(python3 -c 'import secrets; print(secrets.token_hex(32))')
@@ -100,10 +100,19 @@ networks:
     external: true
 ```
 
-# Start the service
+### 5. Start the service
 ```bash
 docker-compose up -d
 ```
+
+### 6. Set up pg-ip-whitelister in pangolin as a local resource, HTTP pointing to hostname to ip.yourdomain.com (or whatever you would like to call it)
+```pg-ip-whitelister```
+Which is derived from the docker hostname
+port
+```5000```
+And make sure it is behind SSO (Or your chosen auth pattern)
+
+### 7. visit ip.domain.com and see the site, check your IP adress and add it to whitelist
 
 ## Development
 ### Setup Development Environment
