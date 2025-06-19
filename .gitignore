@@ -67,4 +67,4 @@ htmlcov/
 *.temp
 
 # Build artifacts
-pg_ip_whitelister_v3.egg-info/ 
+pg_ip_whitelister_v3.egg-info/

@@ -257,7 +257,7 @@
                                             </svg>
                                             <span x-text="resource.fullDomain"></span>
                                         </div>
-                                    </label>
+                                    </div>
                                 </div>
                             </div>
                         </template>
@@ -328,11 +328,20 @@
                 
                 init() {
                     this.getClientIP();
-                    this.getResources();
+                    // Delay getting resources slightly to ensure IP is loaded first
+                    setTimeout(() => {
+                        this.getResources();
+                    }, 100);
                 },
                 
+                // Watch for IP changes and re-check status
                 getClientIP() {
-                    fetch('/api/client-ip')
+                    fetch('/api/client-ip', {
+                        headers: {
+                            'Cache-Control': 'no-cache',
+                            'Pragma': 'no-cache'
+                        }
+                    })
                         .then(response => {
                             if (!response.ok) {
                                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -341,7 +350,13 @@
                         })
                         .then(data => {
                             if (data.success) {
+                                const oldIp = this.ip;
                                 this.ip = data.ip;
+                                
+                                // If IP changed and we have resources, re-check status
+                                if (oldIp !== this.ip && this.resourcesWithStatus.length > 0) {
+                                    this.recheckAllStatus();
+                                }
                             } else {
                                 console.error('Failed to get IP:', data.error);
                                 this.ip = null;
@@ -355,11 +370,28 @@
                         });
                 },
                 
+                // Re-check status for all resources
+                recheckAllStatus() {
+                    if (!this.ip || this.resourcesWithStatus.length === 0) return;
+                    
+                    this.resourcesWithStatus.forEach((resource, index) => {
+                        // Reset status before checking
+                        this.resourcesWithStatus[index].alreadyWhitelisted = false;
+                        this.resourcesWithStatus[index].checkingStatus = true;
+                        this.checkWhitelistStatus(resource, index);
+                    });
+                },
+                
                 getResources() {
                     this.loadingResources = true;
                     this.resourcesError = null;
                     
-                    fetch('/api/resources')
+                    fetch('/api/resources', {
+                        headers: {
+                            'Cache-Control': 'no-cache',
+                            'Pragma': 'no-cache'
+                        }
+                    })
                         .then(response => {
                             if (!response.ok) {
                                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -377,13 +409,15 @@
                                         ...resource,
                                         alreadyWhitelisted: false,
                                         whitelistEnabled: true,
-                                        checkingStatus: true
+                                        checkingStatus: false  // Start with false, will be set to true when checking
                                     }));
                                 
-                                // For each resource, check if IP is whitelisted
-                                this.resourcesWithStatus.forEach((resource, index) => {
-                                    this.checkWhitelistStatus(resource, index);
-                                });
+                                // For each resource, check if IP is whitelisted (only if we have an IP)
+                                if (this.ip) {
+                                    this.resourcesWithStatus.forEach((resource, index) => {
+                                        this.checkWhitelistStatus(resource, index);
+                                    });
+                                }
                             } else {
                                 this.resourcesError = data.error || 'Failed to load resources';
                             }
@@ -397,36 +431,60 @@
                 },
                 
                 checkWhitelistStatus(resource, index) {
-                    if (!this.ip) return;
+                    if (!this.ip) {
+                        this.resourcesWithStatus[index].checkingStatus = false;
+                        return;
+                    }
                     
-                    fetch('/api/check-whitelist', {
+                    // Set checking status to true when starting the check
+                    this.resourcesWithStatus[index].checkingStatus = true;
+                    
+                    // Add cache-busting parameter to prevent caching
+                    const timestamp = new Date().getTime();
+                    
+                    // Create a timeout promise
+                    const timeoutPromise = new Promise((_, reject) => {
+                        setTimeout(() => reject(new Error('Request timeout')), 10000); // 10 second timeout
+                    });
+                    
+                    // Create the fetch promise
+                    const fetchPromise = fetch('/api/check-whitelist', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
+                            'Cache-Control': 'no-cache',
+                            'Pragma': 'no-cache'
                         },
                         body: JSON.stringify({
                             resourceId: resource.resourceId,
                             ip: this.ip
                         })
-                    })
-                    .then(response => {
-                        if (!response.ok) {
-                            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                        }
-                        return response.json();
-                    })
-                    .then(data => {
-                        if (data.success) {
-                            this.resourcesWithStatus[index].alreadyWhitelisted = data.isWhitelisted;
-                        } else {
-                            console.error('Failed to check whitelist status:', data.error);
-                        }
-                        this.resourcesWithStatus[index].checkingStatus = false;
-                    })
-                    .catch(error => {
-                        console.error('Error checking whitelist status:', error);
-                        this.resourcesWithStatus[index].checkingStatus = false;
                     });
+                    
+                    // Race between fetch and timeout
+                    Promise.race([fetchPromise, timeoutPromise])
+                        .then(response => {
+                            if (!response.ok) {
+                                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                            }
+                            return response.json();
+                        })
+                        .then(data => {
+                            if (data.success) {
+                                this.resourcesWithStatus[index].alreadyWhitelisted = data.isWhitelisted;
+                            } else {
+                                console.error('Failed to check whitelist status:', data.error);
+                                // Set a default state if the check fails
+                                this.resourcesWithStatus[index].alreadyWhitelisted = false;
+                            }
+                            this.resourcesWithStatus[index].checkingStatus = false;
+                        })
+                        .catch(error => {
+                            console.error('Error checking whitelist status:', error);
+                            // Ensure checking status is always set to false on error
+                            this.resourcesWithStatus[index].checkingStatus = false;
+                            this.resourcesWithStatus[index].alreadyWhitelisted = false;
+                        });
                 },
                 
                 get allSelected() {

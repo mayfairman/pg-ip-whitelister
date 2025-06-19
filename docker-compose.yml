@@ -2,7 +2,9 @@ version: '3.8'
 
 services:
   pg-ip-whitelister:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile.alpine-optimized
     container_name: pg-ip-whitelister
     ports:
       - "5000:5000"
@@ -14,32 +16,25 @@ services:
       
       # Flask Configuration
       - SECRET_KEY=${SECRET_KEY}
-      - FLASK_ENV=${FLASK_ENV:-production}
+      - FLASK_ENV=production
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
-    
-    # Alternative: Use env_file for easier management
-    # env_file:
-    #   - .env
+      - PYTHONUNBUFFERED=1
     
     volumes:
       # Mount logs directory for persistence
       - ./logs:/app/logs
-      
-      # Mount .env file (uncomment if using env_file approach)
-      # - ./.env:/app/.env:ro
     
     restart: unless-stopped
     
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5000/api/client-ip"]
+      test: ["CMD", "curl", "-f", "--max-time", "5", "http://localhost:5000/api/client-ip"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
     
-    networks:
-      - pg-network
-
-networks:
-  pg-network:
-    driver: bridge 
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3" 

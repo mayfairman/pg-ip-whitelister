@@ -61,4 +61,4 @@ case "${1:-all}" in
         ;;
 esac
 
-echo "✅ Tests completed!" 
+echo "✅ Tests completed!"

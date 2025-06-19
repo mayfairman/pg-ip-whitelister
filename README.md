@@ -7,7 +7,7 @@ A self-service web application that allows authenticated users to whitelist thei
 - 🔐 **Secure Authentication**: Integrates with Pangolin's SSO authentication
 - 🌐 **IP Detection**: Automatically detects user's direct IP address
 - 📋 **Resource Management**: Lists available resources from Pangolin API
-- ✅ **Whitelist Status**: Shows which resources already have user's IP whitelisted
+- ✅ **Whitelist Status**: Shows which resources already have user's current IP whitelisted
 - 🎯 **Bulk Operations**: Select multiple resources for whitelisting
 - 📊 **Real-time Feedback**: Immediate status updates and error handling
 
@@ -17,102 +17,122 @@ A self-service web application that allows authenticated users to whitelist thei
 - **Frontend**: Single-page application using Alpine.js and Tailwind CSS
 - **Integration**: Direct integration with Pangolin API
 - **Deployment**: Containerized for easy deployment alongside Pangolin
+- **Security**: The Pangolin Integration API should **not** be exposed to the public internet. It only needs to be accessible locally (e.g., via `pangolin` docker bridge network or the VPS's private network interface). The whitelister app communicates with Pangolin over the local network, ensuring your API credentials and traffic remain secure and internal.
 
 ## Quick Start
 
-### Prerequisites
 
-- Python 3.11+
-- Pangolin API access
-- Environment variables configured
+### 1. Enable the integartion server
+As per https://docs.fossorial.io/Pangolin/API/integration-api#enable-integration-api
 
-### Installation
+Update the Pangolin config file (config.yml):
+```yaml
+  server:
+    integration_port: 3003
 
-1. **Clone the repository**
-   ```bash
-   git clone <repository-url>
-   cd pg_ip_whitelister_v3
-   ```
+  flags:
+    enable_integration_api: true
+```
+Do not follow the rest of that guide - as it later exposes to the external web, which you dont need for this.
 
-2. **Install dependencies**
-   ```bash
-   pip install -e .
-   ```
+### 2. Create Pangolin API Key
+Pangolin -> Server Admin -> API Keys -> Create a new Key with these minimum permissions:-
+* List Resources
+* Create Resource Rule
+* List Resource Rules
+* Update Resource Rule
 
-3. **Configure environment variables**
-   ```bash
-   export PANGOLIN_API_URL="local-address-of-pangolin-server:3001"
-   export PANGOLIN_API_KEY="your-api-key"
-   export PANGOLIN_ORG_ID="your-org-id"
-   export SECRET_KEY="your-secret-key"
-   export FLASK_ENV="development"
-   ```
-
-4. **Run the application**
-   ```bash
-   python app.py
-   ```
-
-The application will be available at `http://localhost:5000`
-
-## Configuration
-
-### Environment Variables
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `PANGOLIN_API_URL` | Pangolin API base URL | `local-address-of-pangolin-server:3001` |
-| `PANGOLIN_API_KEY` | Pangolin API authentication key | Required |
-| `PANGOLIN_ORG_ID` | Pangolin organization ID | Required |
-| `SECRET_KEY` | Flask secret key for sessions | `dev-secret-key-change-in-production` |
-| `FLASK_ENV` | Flask environment | `production` |
-| `LOG_LEVEL` | Logging level | `INFO` |
-
-### Production Deployment
-
-For production deployment, use Gunicorn:
-
+### 3. Create .env on VPS
 ```bash
-gunicorn -w 4 -b 0.0.0.0:5000 app:app
+mkdir pg-ip-whitelister
+cd pg-ip-whitelister
+# Create .env file
+cat > .env << EOF
+PANGOLIN_API_URL=http://pangolin:3002/v1
+PANGOLIN_API_KEY=your_api_key
+PANGOLIN_ORG_ID=your_org_id
+SECRET_KEY=$(python3 -c 'import secrets; print(secrets.token_hex(32))')
+LOG_LEVEL=INFO
+EOF
 ```
 
-## API Endpoints
+###4. Copy docker-compose.yml to your VPS 
+assumption that your pangolin is installed via docker and on bridge network 'pangolin'. Alter if not.
+```yaml
+version: '3.8'
 
-### Frontend Routes
-- `GET /` - Main application interface
+services:
+  pg-ip-whitelister:
+    container_name: pg-ip-whitelister
+    image: pmylward/pg-ip-whitelister:latest
+    ports:
+      - "5000:5000"
+    environment:
+      # Pangolin API Configuration from .env
+      - PANGOLIN_API_URL=${PANGOLIN_API_URL}
+      - PANGOLIN_API_KEY=${PANGOLIN_API_KEY}
+      - PANGOLIN_ORG_ID=${PANGOLIN_ORG_ID}
 
-### API Routes
-- `GET /api/client-ip` - Get client's IP address
-- `GET /api/resources` - Get available resources
-- `GET /api/resource/<id>/rules` - Get rules for a resource
-- `POST /api/check-whitelist` - Check if IP is whitelisted
-- `POST /api/whitelist` - Add IP to whitelist
+      # Flask Configuration
+      - SECRET_KEY=${SECRET_KEY}
+      - FLASK_ENV=${FLASK_ENV:-production}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+
+    volumes:
+      # Mount logs directory for persistence
+      - ./logs:/app/logs
+
+    restart: unless-stopped
+    
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/api/client-ip"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    
+    networks:
+      - pg-network
+
+networks:
+  pg-network:
+    name: pangolin 
+    external: true
+```
+
+# Start the service
+```bash
+docker-compose up -d
+```
 
 ## Development
-
 ### Setup Development Environment
 
 ```bash
-pip install -e ".[dev]"
+uv sync --dev
 ```
 
 ### Code Quality
 
 ```bash
 # Format code
-black .
+uv run black .
 
 # Lint code
-flake8 .
+uv run flake8 .
 
 # Type checking
-mypy .
+uv run mypy .
 ```
 
 ### Testing
 
 ```bash
 pytest
+```
+OR
+```bash
+./run_tests.sh
 ```
 
 ## Security Considerations
@@ -131,23 +151,6 @@ The application logs to:
 
 Log levels can be configured via `LOG_LEVEL` environment variable.
 
-## Troubleshooting
-
-### Common Issues
-
-1. **API Connection Errors**
-   - Verify `PANGOLIN_API_URL` is correct
-   - Check `PANGOLIN_API_KEY` is valid
-   - Ensure network connectivity
-
-2. **IP Detection Issues**
-   - Application must be behind proper proxy configuration
-   - Check `request.remote_addr` is being set correctly
-
-3. **Resource Loading Failures**
-   - Verify `PANGOLIN_ORG_ID` is correct
-   - Check API permissions for resource access
-
 ## Contributing
 
 1. Fork the repository
@@ -159,3 +162,53 @@ Log levels can be configured via `LOG_LEVEL` environment variable.
 ## License
 
 [Add your license information here]
+
+## Deployment Notes
+
+- **pg-ip-whitelister** is designed to run on the same VPS as your Pangolin API instance.
+- The Pangolin API should **not** be exposed to the public internet. It only needs to be accessible locally (e.g., via `localhost` or the VPS's private network interface).
+- The whitelister app communicates with Pangolin over the local network, ensuring your API credentials and traffic remain secure and internal.
+
+**Example Pangolin API URL for local-only access:**
+```
+PANGOLIN_API_URL=http://localhost:3001
+```
+or, if using Docker Compose:
+```
+PANGOLIN_API_URL=http://pangolin:3001
+```
+(where `pangolin` is the Docker service name)
+
+> **Do not expose your Pangolin API port to the public.**  
+> Only the whitelister app's web interface should be accessible externally.
+
+## Pre-commit Hooks
+
+This project uses [pre-commit](https://pre-commit.com/) to ensure code quality and security.
+
+### Setup
+
+1. **Install pre-commit in your uv environment:**
+   ```bash
+   uv add pre-commit
+   ```
+
+2. **Install the pre-commit hooks:**
+   ```bash
+   uv run pre-commit install
+   ```
+
+3. **(Optional) Run all hooks on all files:**
+   ```bash
+   uv run pre-commit run --all-files
+   ```
+
+### Hooks Used
+
+- **black**: Code formatter
+- **isort**: Import sorter (configured for Black compatibility)
+- **flake8**: Linter (line length ignored, handled by Black)
+- **bandit**: Security linter (uses `bandit.yaml` config)
+- **detect-private-key**: Prevents accidental commits of secrets
+
+Bandit uses a custom configuration file (`bandit.yaml`) in this project. Adjust it as needed for your security policies.

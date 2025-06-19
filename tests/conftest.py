@@ -1,4 +1,5 @@
 import pytest
+
 from app import create_app
 from app.config import TestingConfig
 
@@ -19,4 +20,4 @@ def client(app):
 @pytest.fixture
 def runner(app):
     """Create test runner."""
-    return app.test_cli_runner() 
+    return app.test_cli_runner()

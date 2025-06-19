@@ -1,21 +1,22 @@
 import ipaddress
-import re
 from typing import Optional
+
+from flask import Request
 
 
 def validate_ip_address(ip: str) -> bool:
     """
     Validate if the given string is a valid IP address.
-    
+
     Args:
         ip: IP address string to validate
-        
+
     Returns:
         bool: True if valid IP address, False otherwise
     """
     if not ip or not isinstance(ip, str):
         return False
-    
+    # Validate with ipaddress module
     try:
         ipaddress.ip_address(ip)
         return True
@@ -23,62 +24,25 @@ def validate_ip_address(ip: str) -> bool:
         return False
 
 
-def sanitize_ip_address(ip: str) -> Optional[str]:
+def get_real_ip(request: Request, depth: int = 0) -> Optional[str]:
     """
-    Sanitize and validate IP address string.
-    
+    Get the real client IP address from the request.
+
     Args:
-        ip: IP address string to sanitize
-        
+        request: Flask request object
+        depth: Recursion depth for proxy headers
+
     Returns:
-        str: Sanitized IP address or None if invalid
+        str: Real client IP address or None if not found
     """
-    if not ip:
-        return None
-    
-    # Remove whitespace and convert to string
-    ip = str(ip).strip()
-    
-    # Basic format check
-    if not re.match(r'^(\d{1,3}\.){3}\d{1,3}$', ip):
-        return None
-    
-    # Validate with ipaddress module
-    try:
-        ip_obj = ipaddress.ip_address(ip)
-        return str(ip_obj)
-    except ValueError:
-        return None
 
-
-def is_private_ip(ip: str) -> bool:
-    """
-    Check if the given IP address is private.
-    
-    Args:
-        ip: IP address string to check
-        
-    Returns:
-        bool: True if private IP, False otherwise
-    """
-    if not validate_ip_address(ip):
-        return False
-    
-    try:
-        ip_obj = ipaddress.ip_address(ip)
-        return ip_obj.is_private
-    except ValueError:
-        return False
-
-
-def format_error_message(error: Exception) -> str:
-    """
-    Format error message for logging and user display.
-    
-    Args:
-        error: Exception object
-        
-    Returns:
-        str: Formatted error message
-    """
-    return f"{type(error).__name__}: {str(error)}" 
+    xff = request.headers.get("X-Forwarded-For", "")
+    if xff:
+        # Strip whitespace and split by comma
+        ips = [ip.strip() for ip in xff.split(",")]
+        if len(ips) > depth:
+            return ips[depth]
+        else:
+            return ips[0]
+    # Fallback last to remote_addr
+    return request.remote_addr
