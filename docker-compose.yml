@@ -2,9 +2,7 @@ version: '3.8'
 
 services:
   pg-ip-whitelister:
-    build:
-      context: .
-      dockerfile: Dockerfile.alpine-optimized
+    image: pmylward/pg-ip-whitelister:latest
     container_name: pg-ip-whitelister
     ports:
       - "5000:5000"
