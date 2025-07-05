@@ -216,6 +216,252 @@ class PangolinAPI:
             )
             return 1  # Fallback to priority 1
 
+    def delete_rule(self, resource_id: int, rule_id: int) -> Dict[str, Any]:
+        """
+        Delete a specific rule from a resource.
+
+        Args:
+            resource_id: ID of the resource
+            rule_id: ID of the rule to delete
+
+        Returns:
+            Dictionary containing operation result
+        """
+        try:
+            # Input validation
+            if not isinstance(resource_id, int) or resource_id <= 0:
+                return {
+                    "success": False,
+                    "message": "Invalid resource ID",
+                    "error": "INVALID_RESOURCE_ID",
+                }
+
+            if not isinstance(rule_id, int) or rule_id <= 0:
+                return {
+                    "success": False,
+                    "message": "Invalid rule ID",
+                    "error": "INVALID_RULE_ID",
+                }
+
+            logger.info(f"Deleting rule {rule_id} from resource {resource_id}")
+
+            result = self._make_request(
+                "DELETE", f"resource/{resource_id}/rule/{rule_id}"
+            )
+
+            if result.get("success", False):
+                logger.info(
+                    f"Successfully deleted rule {rule_id} from resource {resource_id}"
+                )
+                return {
+                    "success": True,
+                    "message": "Rule successfully deleted",
+                }
+            else:
+                error_msg = result.get("message", "Failed to delete rule")
+                logger.error(
+                    f"Failed to delete rule {rule_id} from resource {resource_id}: {error_msg}"
+                )
+                return {
+                    "success": False,
+                    "message": error_msg,
+                    "error": result.get("error", "API_ERROR"),
+                }
+
+        except PangolinAPIError as e:
+            logger.error(
+                f"API error deleting rule {rule_id} from resource {resource_id}: {e}"
+            )
+            return {
+                "success": False,
+                "message": f"Failed to delete rule: {str(e)}",
+                "error": "API_ERROR",
+            }
+        except Exception as e:
+            logger.error(
+                f"Unexpected error deleting rule {rule_id} from resource {resource_id}: {e}"
+            )
+            return {
+                "success": False,
+                "message": f"Failed to delete rule: {str(e)}",
+                "error": "UNEXPECTED_ERROR",
+            }
+
+    def delete_all_ip_rules(self, resource_id: int) -> Dict[str, Any]:
+        """
+        Delete all IP whitelist rules from a resource.
+
+        Args:
+            resource_id: ID of the resource
+
+        Returns:
+            Dictionary containing operation result
+        """
+        try:
+            # Input validation
+            if not isinstance(resource_id, int) or resource_id <= 0:
+                return {
+                    "success": False,
+                    "message": "Invalid resource ID",
+                    "error": "INVALID_RESOURCE_ID",
+                }
+
+            # Get all rules for the resource
+            rules = self.get_resource_rules(resource_id)
+            if rules is None:
+                return {
+                    "success": False,
+                    "message": "Failed to fetch resource rules",
+                    "error": "FETCH_RULES_ERROR",
+                }
+
+            # Filter for IP whitelist rules
+            ip_rules = [
+                rule
+                for rule in rules
+                if rule.get("match") == "IP" and rule.get("action") == "ACCEPT"
+            ]
+
+            if not ip_rules:
+                logger.info(f"No IP whitelist rules found for resource {resource_id}")
+                return {
+                    "success": True,
+                    "message": "No IP whitelist rules to delete",
+                    "deleted_count": 0,
+                }
+
+            logger.info(
+                f"Deleting {len(ip_rules)} IP whitelist rules from resource {resource_id}"
+            )
+
+            # Delete each IP rule
+            deleted_count = 0
+            failed_deletes = []
+
+            for rule in ip_rules:
+                rule_id = rule.get("id") or rule.get("ruleId")
+                if not rule_id:
+                    logger.warning(f"Rule missing ID, skipping: {rule}")
+                    continue
+
+                delete_result = self.delete_rule(resource_id, rule_id)
+                if delete_result.get("success"):
+                    deleted_count += 1
+                else:
+                    failed_deletes.append(
+                        {
+                            "rule_id": rule_id,
+                            "ip": rule.get("value"),
+                            "error": delete_result.get("message"),
+                        }
+                    )
+
+            if failed_deletes:
+                logger.warning(
+                    f"Failed to delete {len(failed_deletes)} rules from resource {resource_id}"
+                )
+                return {
+                    "success": False,
+                    "message": f"Deleted {deleted_count} rules, failed to delete {len(failed_deletes)} rules",
+                    "deleted_count": deleted_count,
+                    "failed_deletes": failed_deletes,
+                }
+            else:
+                logger.info(
+                    f"Successfully deleted all {deleted_count} IP whitelist rules from resource {resource_id}"
+                )
+                return {
+                    "success": True,
+                    "message": f"Successfully deleted {deleted_count} IP whitelist rules",
+                    "deleted_count": deleted_count,
+                }
+
+        except Exception as e:
+            logger.error(
+                f"Unexpected error deleting all IP rules from resource {resource_id}: {e}"
+            )
+            return {
+                "success": False,
+                "message": f"Failed to delete IP rules: {str(e)}",
+                "error": "UNEXPECTED_ERROR",
+            }
+
+    def replace_ip_whitelist(self, resource_id: int, ip: str) -> Dict[str, Any]:
+        """
+        Replace all IP whitelist rules with a single IP.
+
+        Args:
+            resource_id: ID of the resource
+            ip: IP address to whitelist
+
+        Returns:
+            Dictionary containing operation result
+        """
+        try:
+            # Input validation
+            if not validate_ip_address(ip):
+                return {
+                    "success": False,
+                    "message": "Invalid IP address format",
+                    "error": "INVALID_IP",
+                }
+
+            if not isinstance(resource_id, int) or resource_id <= 0:
+                return {
+                    "success": False,
+                    "message": "Invalid resource ID",
+                    "error": "INVALID_RESOURCE_ID",
+                }
+
+            logger.info(
+                f"Replacing all IP whitelist rules for resource {resource_id} with {ip}"
+            )
+
+            # Step 1: Delete all existing IP rules
+            delete_result = self.delete_all_ip_rules(resource_id)
+            if not delete_result.get("success"):
+                logger.error(
+                    f"Failed to delete existing IP rules for resource {resource_id}: {delete_result.get('message')}"
+                )
+                return {
+                    "success": False,
+                    "message": f"Failed to clear existing IP rules: {delete_result.get('message')}",
+                    "error": "DELETE_FAILED",
+                }
+
+            # Step 2: Add the new IP
+            add_result = self.add_ip_to_whitelist(resource_id, ip)
+            if not add_result.get("success"):
+                logger.error(
+                    f"Failed to add new IP {ip} for resource {resource_id}: {add_result.get('message')}"
+                )
+                return {
+                    "success": False,
+                    "message": f"Cleared existing rules but failed to add new IP: {add_result.get('message')}",
+                    "error": "ADD_FAILED",
+                    "deleted_count": delete_result.get("deleted_count", 0),
+                }
+
+            logger.info(
+                f"Successfully replaced IP whitelist for resource {resource_id} with {ip}"
+            )
+            return {
+                "success": True,
+                "message": f"Successfully replaced all IP rules with {ip}",
+                "deleted_count": delete_result.get("deleted_count", 0),
+                "new_rule": add_result.get("rule", {}),
+            }
+
+        except Exception as e:
+            logger.error(
+                f"Unexpected error replacing IP whitelist for resource {resource_id}: {e}"
+            )
+            return {
+                "success": False,
+                "message": f"Failed to replace IP whitelist: {str(e)}",
+                "error": "UNEXPECTED_ERROR",
+            }
+
     def add_ip_to_whitelist(self, resource_id: int, ip: str) -> Dict[str, Any]:
         """
         Add an IP address to the whitelist for a specific resource.

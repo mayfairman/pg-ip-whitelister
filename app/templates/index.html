@@ -231,7 +231,7 @@
                                                     Disabled
                                                 </span>
                                             </div>
-                                            <div class="flex items-center">
+                                            <div class="flex items-center space-x-3">
                                                 <template x-if="resource.alreadyWhitelisted">
                                                     <span class="inline-flex items-center text-green-600 dark:text-green-400 text-sm font-medium">
                                                         <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -249,6 +249,14 @@
                                                         Checking...
                                                     </span>
                                                 </template>
+                                                <!-- Manage IPs Button -->
+                                                <button @click="openManageIPs(resource)" 
+                                                        class="inline-flex items-center px-3 py-1 text-xs font-medium bg-gray-100 dark:bg-dark-600 hover:bg-gray-200 dark:hover:bg-dark-500 text-gray-700 dark:text-gray-300 rounded-md transition-colors">
+                                                    <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4"></path>
+                                                    </svg>
+                                                    Manage IPs
+                                                </button>
                                             </div>
                                         </div>
                                         <div class="text-sm text-gray-500 dark:text-gray-400 mt-1 flex items-center">
@@ -311,6 +319,169 @@
                 </template>
             </div>
         </div>
+        
+        <!-- IP Management Modal -->
+        <div x-show="showManageModal" 
+             x-transition:enter="transition ease-out duration-300"
+             x-transition:enter-start="opacity-0"
+             x-transition:enter-end="opacity-100"
+             x-transition:leave="transition ease-in duration-200"
+             x-transition:leave-start="opacity-100"
+             x-transition:leave-end="opacity-0"
+             class="fixed inset-0 z-50 overflow-y-auto" 
+             style="display: none;">
+            <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+                <!-- Background overlay -->
+                <div x-show="showManageModal" 
+                     x-transition:enter="transition ease-out duration-300"
+                     x-transition:enter-start="opacity-0"
+                     x-transition:enter-end="opacity-100"
+                     x-transition:leave="transition ease-in duration-200"
+                     x-transition:leave-start="opacity-100"
+                     x-transition:leave-end="opacity-0"
+                     @click="closeManageModal()" 
+                     class="fixed inset-0 bg-gray-500 bg-opacity-75 dark:bg-gray-900 dark:bg-opacity-80 transition-opacity"></div>
+
+                <!-- Modal panel -->
+                <div x-show="showManageModal" 
+                     x-transition:enter="transition ease-out duration-300"
+                     x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+                     x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
+                     x-transition:leave="transition ease-in duration-200"
+                     x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
+                     x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+                     class="inline-block align-bottom bg-white dark:bg-dark-800 rounded-2xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                    
+                    <!-- Modal Header -->
+                    <div class="bg-white dark:bg-dark-800 px-6 pt-6">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center">
+                                <div class="bg-purple-100 dark:bg-purple-900 p-2 rounded-lg mr-3">
+                                    <svg class="w-6 h-6 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4"></path>
+                                    </svg>
+                                </div>
+                                <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100" x-text="'Manage IPs - ' + (selectedResource?.name || 'Resource')"></h3>
+                            </div>
+                            <button @click="closeManageModal()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Modal Body -->
+                    <div class="bg-white dark:bg-dark-800 px-6 py-4">
+                        <!-- Loading State -->
+                        <div x-show="loadingManageData" class="flex items-center justify-center py-8">
+                            <svg class="animate-spin h-8 w-8 text-purple-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            <span class="ml-3 text-gray-600 dark:text-gray-400">Loading IP rules...</span>
+                        </div>
+
+                        <!-- Error State -->
+                        <div x-show="manageError" class="mb-4 p-4 bg-red-50 dark:bg-red-900 border border-red-200 dark:border-red-700 rounded-xl">
+                            <div class="flex items-center text-red-800 dark:text-red-200">
+                                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                                <span x-text="manageError"></span>
+                            </div>
+                        </div>
+
+                        <!-- IP Rules List -->
+                        <div x-show="!loadingManageData && !manageError">
+                            <!-- Current IP Info -->
+                            <div class="mb-4 p-3 bg-blue-50 dark:bg-blue-900 border border-blue-200 dark:border-blue-700 rounded-lg">
+                                <div class="flex items-center text-blue-800 dark:text-blue-200 text-sm">
+                                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                    </svg>
+                                    <span>Your current IP: <strong x-text="ip"></strong></span>
+                                </div>
+                            </div>
+
+                            <!-- No IPs State -->
+                            <div x-show="whitelistedIPs.length === 0" class="text-center py-6 text-gray-500 dark:text-gray-400">
+                                <svg class="w-12 h-12 mx-auto mb-3 text-gray-300 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 12h6m-6-4h6m2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                <p>No IP addresses are currently whitelisted for this resource.</p>
+                            </div>
+
+                            <!-- IP List -->
+                            <div x-show="whitelistedIPs.length > 0" class="space-y-2 max-h-64 overflow-y-auto">
+                                <template x-for="ipRule in whitelistedIPs" :key="ipRule.id">
+                                    <div class="flex items-center justify-between p-3 bg-gray-50 dark:bg-dark-700 rounded-lg border border-gray-200 dark:border-dark-600">
+                                        <div class="flex items-center">
+                                            <svg class="w-4 h-4 mr-2 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                                            </svg>
+                                            <span class="font-mono text-sm text-gray-800 dark:text-gray-200" x-text="ipRule.value"></span>
+                                            <span x-show="ipRule.value === ip" class="ml-2 px-2 py-1 text-xs bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 rounded-full">Current</span>
+                                        </div>
+                                        <button @click="deleteIP(ipRule)" 
+                                                :disabled="deletingRules.includes(ipRule.id)"
+                                                class="inline-flex items-center px-2 py-1 text-xs font-medium bg-red-100 dark:bg-red-900 hover:bg-red-200 dark:hover:bg-red-800 text-red-700 dark:text-red-300 rounded-md transition-colors disabled:opacity-50">
+                                            <svg x-show="!deletingRules.includes(ipRule.id)" class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                            </svg>
+                                            <svg x-show="deletingRules.includes(ipRule.id)" class="animate-spin w-3 h-3 mr-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                            </svg>
+                                            Remove
+                                        </button>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Modal Footer -->
+                    <div class="bg-gray-50 dark:bg-dark-700 px-6 py-4 space-y-3">
+                        <!-- Bulk Actions -->
+                        <div x-show="whitelistedIPs.length > 0" class="flex flex-col sm:flex-row gap-2">
+                            <button @click="deleteAllIPs()" 
+                                    :disabled="performingBulkAction"
+                                    class="flex-1 inline-flex items-center justify-center px-4 py-2 text-sm font-medium bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors disabled:opacity-50">
+                                <svg x-show="!performingBulkAction" class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                </svg>
+                                <svg x-show="performingBulkAction" class="animate-spin w-4 h-4 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                Remove All
+                            </button>
+                            <button @click="replaceWithCurrentIP()" 
+                                    :disabled="performingBulkAction"
+                                    class="flex-1 inline-flex items-center justify-center px-4 py-2 text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50">
+                                <svg x-show="!performingBulkAction" class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                                </svg>
+                                <svg x-show="performingBulkAction" class="animate-spin w-4 h-4 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                Replace with Current IP
+                            </button>
+                        </div>
+                        
+                        <!-- Close Button -->
+                        <div class="flex justify-end">
+                            <button @click="closeManageModal()" 
+                                    class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-dark-600 border border-gray-300 dark:border-dark-500 rounded-lg hover:bg-gray-50 dark:hover:bg-dark-500 transition-colors">
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -325,6 +496,15 @@
                 selectedResources: [],
                 submitting: false,
                 resultMessages: [],
+                
+                // IP Management Modal state
+                showManageModal: false,
+                selectedResource: null,
+                whitelistedIPs: [],
+                loadingManageData: false,
+                manageError: null,
+                deletingRules: [],
+                performingBulkAction: false,
                 
                 init() {
                     this.getClientIP();
@@ -628,6 +808,213 @@
                         .finally(() => {
                             this.submitting = false;
                         });
+                },
+                
+                // IP Management Modal Functions
+                openManageIPs(resource) {
+                    this.selectedResource = resource;
+                    this.showManageModal = true;
+                    this.loadIPRules();
+                },
+                
+                closeManageModal() {
+                    this.showManageModal = false;
+                    this.selectedResource = null;
+                    this.whitelistedIPs = [];
+                    this.manageError = null;
+                    this.deletingRules = [];
+                    this.performingBulkAction = false;
+                },
+                
+                loadIPRules() {
+                    if (!this.selectedResource) return;
+                    
+                    this.loadingManageData = true;
+                    this.manageError = null;
+                    
+                    fetch(`/api/resource/${this.selectedResource.resourceId}/rules`, {
+                        headers: {
+                            'Cache-Control': 'no-cache',
+                            'Pragma': 'no-cache'
+                        }
+                    })
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        if (data.success) {
+                            // Filter for IP whitelist rules
+                            this.whitelistedIPs = data.data.filter(rule => 
+                                rule.match === 'IP' && rule.action === 'ACCEPT'
+                            );
+                            console.log('Loaded IP rules:', this.whitelistedIPs);
+                        } else {
+                            this.manageError = data.error || 'Failed to load IP rules';
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error loading IP rules:', error);
+                        this.manageError = 'Failed to load IP rules. Please try again.';
+                    })
+                    .finally(() => {
+                        this.loadingManageData = false;
+                    });
+                },
+                
+                deleteIP(ipRule) {
+                    if (!this.selectedResource || !ipRule) return;
+                    
+                    const ruleId = ipRule.id || ipRule.ruleId;
+                    if (!ruleId) {
+                        console.error('No rule ID found for IP rule:', ipRule);
+                        return;
+                    }
+                    
+                    // Add to deleting list
+                    this.deletingRules.push(ruleId);
+                    
+                    fetch(`/api/resource/${this.selectedResource.resourceId}/rule/${ruleId}`, {
+                        method: 'DELETE',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    })
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        if (data.success) {
+                            // Remove from the local list
+                            this.whitelistedIPs = this.whitelistedIPs.filter(rule => 
+                                (rule.id || rule.ruleId) !== ruleId
+                            );
+                            
+                            // If this was the current IP, update the resource status
+                            if (ipRule.value === this.ip) {
+                                this.updateResourceWhitelistStatus(this.selectedResource.resourceId, false);
+                            }
+                        } else {
+                            console.error('Failed to delete IP rule:', data.message);
+                            alert('Failed to delete IP: ' + (data.message || 'Unknown error'));
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error deleting IP rule:', error);
+                        alert('Failed to delete IP. Please try again.');
+                    })
+                    .finally(() => {
+                        // Remove from deleting list
+                        this.deletingRules = this.deletingRules.filter(id => id !== ruleId);
+                    });
+                },
+                
+                deleteAllIPs() {
+                    if (!this.selectedResource || this.whitelistedIPs.length === 0) return;
+                    
+                    if (!confirm(`Are you sure you want to remove all ${this.whitelistedIPs.length} IP addresses from ${this.selectedResource.name}?`)) {
+                        return;
+                    }
+                    
+                    this.performingBulkAction = true;
+                    
+                    fetch(`/api/resource/${this.selectedResource.resourceId}/ip-rules`, {
+                        method: 'DELETE',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    })
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        if (data.success) {
+                            this.whitelistedIPs = [];
+                            // Update resource status since current IP is no longer whitelisted
+                            this.updateResourceWhitelistStatus(this.selectedResource.resourceId, false);
+                            alert(`Successfully removed ${data.deleted_count || 0} IP addresses`);
+                        } else {
+                            console.error('Failed to delete all IP rules:', data.message);
+                            alert('Failed to remove all IPs: ' + (data.message || 'Unknown error'));
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error deleting all IP rules:', error);
+                        alert('Failed to remove all IPs. Please try again.');
+                    })
+                    .finally(() => {
+                        this.performingBulkAction = false;
+                    });
+                },
+                
+                replaceWithCurrentIP() {
+                    if (!this.selectedResource || !this.ip) return;
+                    
+                    const currentCount = this.whitelistedIPs.length;
+                    if (!confirm(`Are you sure you want to replace all ${currentCount} IP addresses with your current IP (${this.ip})?`)) {
+                        return;
+                    }
+                    
+                    this.performingBulkAction = true;
+                    
+                    fetch(`/api/resource/${this.selectedResource.resourceId}/replace-ip-whitelist`, {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            ip: this.ip
+                        })
+                    })
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        if (data.success) {
+                            // Reload the IP rules to get the updated list
+                            this.loadIPRules();
+                            // Update resource status
+                            this.updateResourceWhitelistStatus(this.selectedResource.resourceId, true);
+                            alert(`Successfully replaced ${data.deleted_count || 0} IP addresses with ${this.ip}`);
+                        } else {
+                            console.error('Failed to replace IP whitelist:', data.message);
+                            alert('Failed to replace with current IP: ' + (data.message || 'Unknown error'));
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error replacing IP whitelist:', error);
+                        alert('Failed to replace with current IP. Please try again.');
+                    })
+                    .finally(() => {
+                        this.performingBulkAction = false;
+                    });
+                },
+                
+                updateResourceWhitelistStatus(resourceId, isWhitelisted) {
+                    const resourceIndex = this.resourcesWithStatus.findIndex(
+                        r => r.resourceId === resourceId
+                    );
+                    
+                    if (resourceIndex !== -1) {
+                        const newResources = [...this.resourcesWithStatus];
+                        newResources[resourceIndex] = {
+                            ...newResources[resourceIndex],
+                            alreadyWhitelisted: isWhitelisted,
+                            checkingStatus: false
+                        };
+                        this.resourcesWithStatus = newResources;
+                    }
                 }
             };
         }

@@ -207,3 +207,118 @@ def whitelist() -> Response | tuple[Response, int]:
             jsonify({"success": False, "error": "Failed to add IP to whitelist"}),
             500,
         )
+
+
+@main.route("/api/resource/<int:resource_id>/rule/<int:rule_id>", methods=["DELETE"])
+def delete_rule(resource_id: int, rule_id: int) -> Response | tuple[Response, int]:
+    """Delete a specific rule from a resource."""
+    try:
+        # Validate resource_id
+        if resource_id <= 0 or resource_id > 999999999:
+            logger.warning(f"Invalid resource_id: {resource_id}")
+            return jsonify({"success": False, "error": "Invalid resource ID"}), 400
+
+        # Validate rule_id
+        if rule_id <= 0 or rule_id > 999999999:
+            logger.warning(f"Invalid rule_id: {rule_id}")
+            return jsonify({"success": False, "error": "Invalid rule ID"}), 400
+
+        pangolin_api = PangolinAPI()
+        result = pangolin_api.delete_rule(resource_id, rule_id)
+
+        if result.get("success"):
+            logger.info(
+                f"Successfully deleted rule {rule_id} from resource {resource_id}"
+            )
+        else:
+            logger.warning(
+                f"Failed to delete rule {rule_id} from resource {resource_id}: {result.get('message')}"
+            )
+
+        return jsonify(result)
+
+    except Exception as e:
+        logger.error(f"Error deleting rule {rule_id} from resource {resource_id}: {e}")
+        return (
+            jsonify({"success": False, "error": "Failed to delete rule"}),
+            500,
+        )
+
+
+@main.route("/api/resource/<int:resource_id>/ip-rules", methods=["DELETE"])
+def delete_all_ip_rules(resource_id: int) -> Response | tuple[Response, int]:
+    """Delete all IP whitelist rules from a resource."""
+    try:
+        # Validate resource_id
+        if resource_id <= 0 or resource_id > 999999999:
+            logger.warning(f"Invalid resource_id: {resource_id}")
+            return jsonify({"success": False, "error": "Invalid resource ID"}), 400
+
+        pangolin_api = PangolinAPI()
+        result = pangolin_api.delete_all_ip_rules(resource_id)
+
+        if result.get("success"):
+            deleted_count = result.get("deleted_count", 0)
+            logger.info(
+                f"Successfully deleted {deleted_count} IP rules from resource {resource_id}"
+            )
+        else:
+            logger.warning(
+                f"Failed to delete IP rules from resource {resource_id}: {result.get('message')}"
+            )
+
+        return jsonify(result)
+
+    except Exception as e:
+        logger.error(f"Error deleting IP rules from resource {resource_id}: {e}")
+        return (
+            jsonify({"success": False, "error": "Failed to delete IP rules"}),
+            500,
+        )
+
+
+@main.route("/api/resource/<int:resource_id>/replace-ip-whitelist", methods=["PUT"])
+def replace_ip_whitelist(resource_id: int) -> Response | tuple[Response, int]:
+    """Replace all IP whitelist rules with current IP."""
+    try:
+        try:
+            data = request.get_json()
+        except Exception as e:
+            logger.error(f"Failed to parse JSON data: {e}")
+            return jsonify({"success": False, "error": "Invalid JSON data"}), 400
+
+        if not data:
+            logger.error("No JSON data provided to replace-ip-whitelist endpoint")
+            return jsonify({"success": False, "error": "No JSON data provided"}), 400
+
+        # Validate resource_id
+        if resource_id <= 0 or resource_id > 999999999:
+            logger.warning(f"Invalid resource_id: {resource_id}")
+            return jsonify({"success": False, "error": "Invalid resource ID"}), 400
+
+        ip = data.get("ip")
+        if not ip or not validate_ip_address(ip):
+            logger.error(f"Invalid IP address: {ip}")
+            return jsonify({"success": False, "error": "Invalid IP address"}), 400
+
+        pangolin_api = PangolinAPI()
+        result = pangolin_api.replace_ip_whitelist(resource_id, ip)
+
+        if result.get("success"):
+            deleted_count = result.get("deleted_count", 0)
+            logger.info(
+                f"Successfully replaced IP whitelist for resource {resource_id} (deleted {deleted_count} rules, added {ip})"
+            )
+        else:
+            logger.warning(
+                f"Failed to replace IP whitelist for resource {resource_id}: {result.get('message')}"
+            )
+
+        return jsonify(result)
+
+    except Exception as e:
+        logger.error(f"Error replacing IP whitelist for resource {resource_id}: {e}")
+        return (
+            jsonify({"success": False, "error": "Failed to replace IP whitelist"}),
+            500,
+        )
