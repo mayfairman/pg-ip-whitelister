@@ -64,7 +64,7 @@ version: '3.8'
 services:
   pg-ip-whitelister:
     container_name: pg-ip-whitelister
-    image: pmylward/pg-ip-whitelister:latest
+    image: pmylward/pg-ip-whitelister:v1.1.0
     ports:
       - "5000:5000"
     environment:
