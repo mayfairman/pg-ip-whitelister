@@ -231,3 +231,35 @@ class TestPangolinAPI:
         result = api.add_ip_to_whitelist(1, "192.168.1.1")
 
         assert result["success"] is False
+
+
+    @patch.object(PangolinAPI, "_make_request")
+    def test_delete_rule_404_is_success(self, mock_make_request):
+        """Test that a 404 on delete is treated as a success."""
+        mock_make_request.side_effect = PangolinAPIError("Not Found", status_code=404)
+
+        api = PangolinAPI()
+        result = api.delete_rule(1, 123)
+
+        assert result["success"] is True
+        assert "assumed deleted" in result["message"]
+
+    @patch.object(PangolinAPI, "get_resource_rules")
+    @patch.object(PangolinAPI, "delete_rule")
+    def test_delete_all_ip_rules_some_fail(self, mock_delete_rule, mock_get_rules):
+        """Test deleting all IP rules where some deletions fail."""
+        mock_get_rules.return_value = [
+            {"id": 1, "match": "IP", "action": "ACCEPT", "value": "1.1.1.1"},
+            {"id": 2, "match": "IP", "action": "ACCEPT", "value": "2.2.2.2"},
+        ]
+        mock_delete_rule.side_effect = [
+            {"success": True},
+            {"success": False, "message": "API Error"},
+        ]
+
+        api = PangolinAPI()
+        result = api.delete_all_ip_rules(1)
+
+        assert result["success"] is False
+        assert result["deleted_count"] == 1
+        assert len(result["failed_deletes"]) == 1

@@ -13,6 +13,10 @@ logger = logging.getLogger(__name__)
 class PangolinAPIError(Exception):
     """Custom exception for Pangolin API errors."""
 
+    def __init__(self, message, status_code=None):
+        super().__init__(message)
+        self.status_code = status_code
+
 
 class PangolinAPI:
     """Client for interacting with the Pangolin API."""
@@ -83,15 +87,16 @@ class PangolinAPI:
             return result
 
         except requests.exceptions.RequestException as e:
-            logger.error(f"API request failed: {e}")
-            raise PangolinAPIError(f"API request failed: {e}")
+            status_code = e.response.status_code if e.response is not None else None
+            logger.error(f"API request failed with status {status_code}: {e}")
+            raise PangolinAPIError(f"API request failed: {e}", status_code=status_code)
         except ValueError as e:
             logger.error(f"Invalid JSON response: {e}")
             if response:
                 logger.error(f"Response content: {response.text}")
             else:
                 logger.error("No response object available")
-            raise PangolinAPIError(f"Invalid JSON response: {e}")
+            raise PangolinAPIError(f"Invalid JSON response: {e}", status_code=500)
 
     def get_resources(self) -> Optional[List[Dict[str, Any]]]:
         """
@@ -269,6 +274,12 @@ class PangolinAPI:
                 }
 
         except PangolinAPIError as e:
+            if e.status_code == 404:
+                logger.warning(
+                    f"Rule {rule_id} not found for resource {resource_id} during deletion. Assuming already deleted."
+                )
+                return {"success": True, "message": "Rule not found, assumed deleted"}
+
             logger.error(
                 f"API error deleting rule {rule_id} from resource {resource_id}: {e}"
             )
